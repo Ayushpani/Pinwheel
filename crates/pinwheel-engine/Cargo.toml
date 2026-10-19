@@ -1,0 +1,19 @@
+[package]
+name = "pinwheel-engine"
+description = "Pinwheel engine: conversions, batches, safe output and ZIPs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+pinwheel-core.workspace = true
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "bmp", "tiff", "ico", "webp"] }
+webp = "0.3"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+tempfile = "3"
+rayon = "1"
+
+[dev-dependencies]
+zip = { version = "2", default-features = false, features = ["deflate"] }

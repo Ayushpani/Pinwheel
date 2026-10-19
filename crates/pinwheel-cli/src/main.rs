@@ -11,12 +11,15 @@ use sha1::Sha1;
 use sha2::{Digest, Sha256};
 
 use pinwheel_core::filetype::{canonical_ext, family_of, sniff, wrong_extension};
-use pinwheel_core::naming::unique_path;
+use pinwheel_core::naming::{unique_path, validate_template};
 use pinwheel_core::recipe::{FileFacts, Recipe};
 use pinwheel_core::resize::{self, Dimensions, Fit, Length, Target};
 use pinwheel_core::spec::{summary, SpecCard};
 use pinwheel_core::target;
-use pinwheel_core::units::{format_bytes, SizeSpec};
+use pinwheel_core::units::{describe_change, format_bytes, SizeRange, SizeSpec};
+use pinwheel_engine::batch::{self, Action, Report, Settings, ZipMode};
+use pinwheel_engine::image_ops::Format;
+use pinwheel_engine::output::Location;
 
 /// Bytes read from the start of a file to tell what it is.
 const SNIFF_BYTES: u64 = 64 * 1024;
@@ -58,6 +61,30 @@ enum Command {
         #[arg(long)]
         card: PathBuf,
     },
+    /// Convert images or whole folders to another format
+    Convert {
+        /// Files and folders
+        #[arg(required = true)]
+        inputs: Vec<PathBuf>,
+        /// Target format: jpg, png, webp, gif, bmp, tiff or ico
+        #[arg(long)]
+        to: FormatArg,
+        #[command(flatten)]
+        output: OutputArgs,
+    },
+    /// Resize images or whole folders
+    Resize {
+        /// Files and folders
+        #[arg(required = true)]
+        inputs: Vec<PathBuf>,
+        #[command(flatten)]
+        size: SizeArgs,
+        /// Also convert to this format (keeps each file's format if left out)
+        #[arg(long)]
+        to: Option<FormatArg>,
+        #[command(flatten)]
+        output: OutputArgs,
+    },
     /// Validate recipe files
     Recipe { files: Vec<PathBuf> },
     /// Work out a result before making it
@@ -68,7 +95,12 @@ enum Command {
 #[derive(Subcommand)]
 enum Plan {
     /// Output pixels for a resize
-    Resize(ResizeArgs),
+    Resize {
+        /// Source size, such as 4032x3024
+        from: Dimensions,
+        #[command(flatten)]
+        size: SizeArgs,
+    },
     /// Video bitrate that lands just under a file size
     Video {
         #[arg(long)]
@@ -111,9 +143,7 @@ struct Mode {
 }
 
 #[derive(Args)]
-struct ResizeArgs {
-    /// Source size, such as 4032x3024
-    from: Dimensions,
+struct SizeArgs {
     #[command(flatten)]
     mode: Mode,
     #[arg(long)]
@@ -128,6 +158,83 @@ struct ResizeArgs {
     /// Round dimensions to a multiple of this
     #[arg(long, default_value_t = 1)]
     round_to: u32,
+}
+
+#[derive(Args)]
+struct OutputArgs {
+    /// Save results in this folder (keeps the structure of dropped folders)
+    #[arg(long, value_name = "FOLDER", conflicts_with = "subfolder")]
+    into: Option<PathBuf>,
+    /// Save results in a subfolder [default name: Pinwheel]
+    #[arg(long, value_name = "NAME", num_args = 0..=1, default_missing_value = "Pinwheel")]
+    subfolder: Option<String>,
+    /// Also put all results in one ZIP
+    #[arg(long, conflicts_with = "zip_only")]
+    zip: bool,
+    /// Only make the ZIP, with no loose files
+    #[arg(long)]
+    zip_only: bool,
+    /// Quality 1–100 for JPG and WebP
+    #[arg(long, value_parser = clap::value_parser!(u8).range(1..=100))]
+    quality: Option<u8>,
+    /// Aim for a file size, such as "200 KB" or "20-50 KB" (JPG and WebP)
+    #[arg(long)]
+    max_size: Option<SizeRange>,
+    /// Name template, such as "{name}-small" (tokens: {name} {action} {width} {height} {ext})
+    #[arg(long)]
+    name: Option<String>,
+}
+
+impl OutputArgs {
+    fn settings(self) -> Result<Settings, String> {
+        if let Some(t) = &self.name {
+            validate_template(t).map_err(|e| e.to_string())?;
+        }
+        let location = match (self.into, self.subfolder) {
+            (Some(dir), _) => Location::Folder(dir),
+            (None, Some(name)) => Location::Subfolder(name),
+            (None, None) => Location::BesideOriginal,
+        };
+        let zip = match (self.zip, self.zip_only) {
+            (_, true) => ZipMode::Only,
+            (true, false) => ZipMode::Also,
+            _ => ZipMode::Off,
+        };
+        Ok(Settings {
+            quality: self.quality,
+            max_size: self.max_size,
+            location,
+            template: self.name,
+            zip,
+        })
+    }
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum FormatArg {
+    #[value(alias = "jpeg")]
+    Jpg,
+    Png,
+    Webp,
+    Gif,
+    Bmp,
+    #[value(alias = "tif")]
+    Tiff,
+    Ico,
+}
+
+impl From<FormatArg> for Format {
+    fn from(f: FormatArg) -> Format {
+        match f {
+            FormatArg::Jpg => Format::Jpg,
+            FormatArg::Png => Format::Png,
+            FormatArg::Webp => Format::Webp,
+            FormatArg::Gif => Format::Gif,
+            FormatArg::Bmp => Format::Bmp,
+            FormatArg::Tiff => Format::Tiff,
+            FormatArg::Ico => Format::Ico,
+        }
+    }
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -265,7 +372,33 @@ fn run(command: Command) -> Result<bool, String> {
             }
             Ok(ok)
         }
-        Command::Plan(Plan::Resize(args)) => plan_resize(args),
+        Command::Convert { inputs, to, output } => {
+            let action = Action::Convert { to: to.into() };
+            print_report(&batch::run(&inputs, &action, &output.settings()?)?)
+        }
+        Command::Resize {
+            inputs,
+            size,
+            to,
+            output,
+        } => {
+            let (target, options) = size.target()?;
+            let action = Action::Resize {
+                target,
+                options,
+                to: to.map(Into::into),
+            };
+            print_report(&batch::run(&inputs, &action, &output.settings()?)?)
+        }
+        Command::Plan(Plan::Resize { from, size }) => {
+            let (target, options) = size.target()?;
+            let plan = resize::plan(from, &target, &options).map_err(|e| e.to_string())?;
+            println!("{from} → {} px", plan.output);
+            for w in &plan.warnings {
+                println!("{w}");
+            }
+            Ok(true)
+        }
         Command::Plan(Plan::Video {
             size,
             duration,
@@ -284,37 +417,77 @@ fn run(command: Command) -> Result<bool, String> {
     }
 }
 
-fn plan_resize(args: ResizeArgs) -> Result<bool, String> {
-    let m = args.mode;
-    let fit = args.fit.into();
-    let target = if let Some(p) = m.percent {
-        Target::Percent(p)
-    } else if let Some(n) = m.long_edge {
-        Target::LongEdge(n)
-    } else if let Some(n) = m.short_edge {
-        Target::ShortEdge(n)
-    } else if let Some(size) = m.box_size {
-        Target::Box { size, fit }
-    } else if let Some(width) = m.print_width {
-        Target::Print {
-            width,
-            height: args.print_height.expect("clap requires it"),
-            dpi: args.dpi.expect("clap requires it"),
-            fit,
-        }
-    } else {
-        Target::Megapixels(m.megapixels.expect("clap requires one mode"))
-    };
-    let opts = resize::Options {
-        never_enlarge: !args.allow_enlarge,
-        round_to: args.round_to.max(1),
-    };
-    let plan = resize::plan(args.from, &target, &opts).map_err(|e| e.to_string())?;
-    println!("{} → {} px", args.from, plan.output);
-    for w in &plan.warnings {
-        println!("{w}");
+impl SizeArgs {
+    fn target(self) -> Result<(Target, resize::Options), String> {
+        let m = self.mode;
+        let fit = self.fit.into();
+        let target = if let Some(p) = m.percent {
+            Target::Percent(p)
+        } else if let Some(n) = m.long_edge {
+            Target::LongEdge(n)
+        } else if let Some(n) = m.short_edge {
+            Target::ShortEdge(n)
+        } else if let Some(size) = m.box_size {
+            Target::Box { size, fit }
+        } else if let Some(width) = m.print_width {
+            Target::Print {
+                width,
+                height: self.print_height.expect("clap requires it"),
+                dpi: self.dpi.expect("clap requires it"),
+                fit,
+            }
+        } else {
+            Target::Megapixels(m.megapixels.expect("clap requires one mode"))
+        };
+        let options = resize::Options {
+            never_enlarge: !self.allow_enlarge,
+            round_to: self.round_to.max(1),
+        };
+        // Catch a bad value (such as 500%) before touching any file.
+        resize::plan(Dimensions::new(1000, 1000), &target, &options).map_err(|e| e.to_string())?;
+        Ok((target, options))
     }
-    Ok(true)
+}
+
+/// Prints a batch the way the result toast shows it. Ok(false) if any file failed.
+fn print_report(report: &Report) -> Result<bool, String> {
+    for d in &report.done {
+        let size = if d.from == d.to {
+            String::new()
+        } else {
+            format!(" · {} → {} px", d.from, d.to)
+        };
+        println!(
+            "{} → {} · {}{size}",
+            d.input.display(),
+            d.output.display(),
+            describe_change(d.before, d.after)
+        );
+        if let Some(note) = &d.note {
+            println!("  {note}");
+        }
+    }
+    for f in &report.failed {
+        println!("✗ {}", f.message);
+    }
+    if !report.skipped.is_empty() {
+        match report.skipped.len() {
+            1 => println!("Skipped 1 file that is not an image."),
+            n => println!("Skipped {n} files that are not images."),
+        }
+    }
+    if let Some(zip) = &report.zip {
+        let bytes = fs::metadata(zip).map(|m| m.len()).unwrap_or(0);
+        println!("ZIP: {} · {}", zip.display(), format_bytes(bytes));
+    }
+    let n = report.done.len();
+    if n > 1 {
+        println!(
+            "{n} files · {}",
+            describe_change(report.total_before(), report.total_after())
+        );
+    }
+    Ok(report.failed.is_empty())
 }
 
 fn head(path: &Path) -> Result<Vec<u8>, String> {
@@ -330,16 +503,7 @@ fn read_text(path: &Path) -> Result<String, String> {
 }
 
 fn open_error(path: &Path, e: io::Error) -> String {
-    match e.kind() {
-        io::ErrorKind::NotFound => format!(
-            "{} does not exist. Check the name and folder.",
-            path.display()
-        ),
-        io::ErrorKind::PermissionDenied => {
-            format!("{} cannot be opened: permission denied.", path.display())
-        }
-        _ => format!("{} cannot be read: {e}", path.display()),
-    }
+    pinwheel_engine::open_error(path, &e)
 }
 
 fn facts(path: &Path) -> Result<FileFacts, String> {

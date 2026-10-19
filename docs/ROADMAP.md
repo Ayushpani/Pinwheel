@@ -1,5 +1,7 @@
 # Pinwheel Roadmap
 
+Windows is built and tested end to end first (Phases 1–3 and the Windows half of Phase 5, see [FEATURES.md](FEATURES.md)), then Linux, then macOS.
+
 How Pinwheel goes from today's engine core to a 1.0 that ships on Windows, macOS and Linux and lives up to [the vision](VISION.md).
 
 Each of the six phases ends with a **gate**: a list of things that must be true before the next phase starts. No phase has a date; dates come once the team size is known.
@@ -25,7 +27,7 @@ These change the plan, so settle them before Phase 1 ends.
 | Documents to PDF | **typst (Rust) built in. Use pandoc only if it is installed, or ship it as an optional add-on** | pandoc adds about 150 MB to the installer. |
 | RAR archives | **Extract with libarchive only** | The official unRAR licence is not GPL-compatible. |
 | Name | **Check the trademark and domain for "Pinwheel" now** | Renaming after launch costs the package names, the links and the stars. |
-| Costs | Apple Developer ($99/year), Windows code signing (Azure Trusted Signing, about $10/month), a domain | Unsigned apps get blocked by Gatekeeper and SmartScreen, which breaks "first conversion in 60 seconds". |
+| Costs | **Zero.** Free signing for Windows through SignPath Foundation or the Microsoft Store; GitHub Releases, Actions and Pages for hosting; Flathub for Linux. macOS ships unsigned with a short guide until donations cover Apple's $99/year | Unsigned apps get blocked by SmartScreen, which breaks "first conversion in 60 seconds", so Windows must be signed from day one. |
 
 ## Phase 1: Foundations and spikes
 
@@ -95,7 +97,7 @@ The part most converters skip and most people need.
 
 **Gate:** every card in the library lands in range on the test library, or gives a clear reason why not. The vision's UX principles are re-checked against every new panel.
 
-## Phase 4: macOS and Linux
+## Phase 4: Linux, then macOS
 
 The engine is shared, so this phase is only shells, packaging and parity.
 

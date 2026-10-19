@@ -11,7 +11,7 @@ Drag a file, press Shift, and a wheel of choices appears at the cursor: convert 
 - **Yours:** recipes chain steps into one slice; custom actions plug in any command-line tool.
 - **Private:** no accounts, no telemetry, no network connections, no machine-learning models. See [NO-AI.md](NO-AI.md).
 
-Read the full product vision in [docs/VISION.md](docs/VISION.md) and the plan to 1.0 in [docs/ROADMAP.md](docs/ROADMAP.md).
+Read the full product vision in [docs/VISION.md](docs/VISION.md), the Windows feature list in [docs/FEATURES.md](docs/FEATURES.md) and the plan to 1.0 in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Status
 
@@ -20,8 +20,9 @@ Early development. This repository currently holds the shared engine core and th
 | Part | State |
 |---|---|
 | `pinwheel-core`: resize planning, size targeting, output naming, recipes, spec cards, file-type detection | Working, tested |
-| `pinwheel` CLI: `info`, `checksum`, `fix-ext`, `check`, `recipe`, `plan` | Working |
-| Conversions (libvips, ffmpeg, PDFium, …) | Not started |
+| `pinwheel-engine`: bulk convert and resize (JPG, PNG, WebP, GIF, BMP, TIFF, ICO), ZIP after, output location, size targets, safe writing | Working, tested on Linux, macOS and Windows CI |
+| `pinwheel` CLI: `convert`, `resize`, `info`, `checksum`, `fix-ext`, `check`, `recipe`, `plan` | Working |
+| HEIC, RAW, PDF, audio and video conversions | Not started |
 | Native shells for Windows, macOS and Linux | Not started |
 
 ## Try the command-line tool
@@ -36,6 +37,12 @@ cargo run -p pinwheel-cli -- info photo.jpg
 cargo run -p pinwheel-cli -- check photo.jpg --card exam-photo.toml
 # 61 KB, too big (max 50 KB) · 200 × 230 px, OK · JPG, OK
 
+# Convert a whole folder to WebP and ZIP the results
+cargo run -p pinwheel-cli -- convert Holiday --to webp --zip
+
+# Resize everything into another folder, keeping subfolders
+cargo run -p pinwheel-cli -- resize Holiday --long-edge 1920 --into Resized
+
 # Plan a passport photo: 35 × 45 mm at 300 DPI
 cargo run -p pinwheel-cli -- plan resize 4032x3024 --print-width "35 mm" --print-height "45 mm" --dpi 300 --fit fill-crop
 # 4032 × 3024 → 413 × 531 px
@@ -48,6 +55,7 @@ cargo run -p pinwheel-cli -- plan video --size 25MB --duration 120
 
 ```
 crates/pinwheel-core   engine logic shared by every shell and the CLI
+crates/pinwheel-engine conversions, batches, ZIPs and safe output
 crates/pinwheel-cli    the `pinwheel` command
 docs/VISION.md         what Pinwheel is and the rules every feature must pass
 scripts/no-ai-check.sh CI check that keeps ML models and networking out
