@@ -11,7 +11,7 @@ Drag a file, press Shift, and a wheel of choices appears at the cursor: convert 
 - **Yours:** recipes chain steps into one slice; custom actions plug in any command-line tool.
 - **Private:** no accounts, no telemetry, no network connections, no machine-learning models. See [NO-AI.md](NO-AI.md).
 
-Read the full product vision in [docs/VISION.md](docs/VISION.md).
+Read the full product vision in [docs/VISION.md](docs/VISION.md) and the plan to 1.0 in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Status
 

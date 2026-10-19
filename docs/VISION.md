@@ -368,7 +368,7 @@ Pinwheel is built in six phases, and each one starts only when the gate before i
 
 The first usable release is the end of phase 2: one system, the wheel, and conversions. Durations depend on team size, so they are left open until that is known.
 
-> TODO: the per-phase table (scope and gate for phases 1–6) still needs to be written down here.
+The six phases, with the scope and gate for each, are in [ROADMAP.md](ROADMAP.md).
 
 ## How we'll know it's the best
 
