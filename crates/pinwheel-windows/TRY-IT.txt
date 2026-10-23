@@ -1,0 +1,34 @@
+Pinwheel for Windows: early test build
+=======================================
+
+This build is not signed yet, so Windows may say "Windows protected your PC".
+Click "More info", then "Run anyway". Pinwheel needs no install and no internet.
+
+1. Double-click Pinwheel.exe. A pinwheel icon appears next to the clock
+   (it may be hidden under the ^ arrow). A note says "Pinwheel is ready".
+2. In File Explorer, start dragging an image, several images or a folder.
+3. While still holding the mouse button, press Shift. The wheel appears.
+4. Move onto a slice and let go:
+     JPG, PNG, WebP, ICO, TIFF   convert to that format
+     50%                         half the width and height
+     1920 px                     longest side 1920 px
+     500 KB                      JPG under 500 KB
+5. A notification shows what happened. Click it to see the result.
+
+Results are saved next to the originals. Originals are never changed.
+Right-click the tray icon to save results in a "Pinwheel" subfolder or a
+folder you choose, to make a ZIP when converting several files, or to
+start Pinwheel with Windows.
+
+What to check, and tell us about
+- Does the wheel appear when you press Shift during a drag?
+- Does it appear when it should not (for example Shift while selecting text)?
+- Does dropping on each slice give the right result, next to the original?
+- Dragging a whole folder: are all images converted, and subfolders kept?
+- Does moving off the wheel, or pressing Esc, close it and let the drag carry on?
+- Is anything slow, blurry, cut off at the screen edge, or wrong on a second monitor?
+
+Known gaps in this build
+- Images only (JPG, PNG, WebP, GIF, BMP, TIFF, ICO). No HEIC, PDF, audio or video yet.
+- Photo dates and location are not copied to the results yet.
+- No hover size preview, keyboard control or screen-reader names on the wheel yet.
