@@ -23,7 +23,8 @@ Early development. This repository currently holds the shared engine core and th
 | `pinwheel-engine`: bulk convert and resize (JPG, PNG, WebP, GIF, BMP, TIFF, ICO), ZIP after, output location, size targets, safe writing | Working, tested on Linux, macOS and Windows CI |
 | `pinwheel` CLI: `convert`, `resize`, `info`, `checksum`, `fix-ext`, `check`, `recipe`, `plan` | Working |
 | HEIC, RAW, PDF, audio and video conversions | Not started |
-| Native shells for Windows, macOS and Linux | Not started |
+| Windows app: tray icon, wheel on drag + Shift, 8 image slices, save-location and ZIP options, result notifications | Early test build, built by CI as `Pinwheel.exe` |
+| Native apps for Linux and macOS | Not started |
 
 ## Try the command-line tool
 
@@ -56,6 +57,7 @@ cargo run -p pinwheel-cli -- plan video --size 25MB --duration 120
 ```
 crates/pinwheel-core   engine logic shared by every shell and the CLI
 crates/pinwheel-engine conversions, batches, ZIPs and safe output
+crates/pinwheel-windows the Windows tray app and the wheel
 crates/pinwheel-cli    the `pinwheel` command
 docs/VISION.md         what Pinwheel is and the rules every feature must pass
 scripts/no-ai-check.sh CI check that keeps ML models and networking out
